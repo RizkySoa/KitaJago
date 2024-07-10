@@ -1,0 +1,24 @@
+.gallery {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.gallery-item {
+    text-align: center;
+    border: 1px solid #ccc;
+    padding: 10px;
+    transition: transform 0.3s ease; /* Add transition for smooth animation */
+}
+
+.gallery-item img {
+    width: 200px;
+    height: 200px;
+    object-fit: cover;
+}
+
+/* Hover effect */
+.gallery-item:hover {
+    transform: translateY(-5px); /* Adjust as needed */
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); /* Optional: Add shadow for depth */
+}
