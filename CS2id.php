@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
 
-  <title>Valorant</title>
+  <title>Counter Strike 2</title>
   <meta content="" name="description">
   <meta content="" name="keywords">
 
@@ -29,7 +29,7 @@
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 </head>
 
-<body>>
+<body>
 
 <?php include 'sidebar.html'; ?>
 
@@ -72,7 +72,7 @@
 
                 public function handleQuery($user_question) {
                     // SQL query to fetch data from Battlefield1 table
-                    $sql = "SELECT player_name, win, winrate, kills, headshot_percentage, weapon_used, mvp, overall_total_score FROM valorant";
+                    $sql = "SELECT player_name, win, winrate, kills, headshot_percentage, weapon_used, mvp, overall_total_score FROM counterstrike2";
 
                     $result = $this->conn->query($sql);
 
@@ -88,7 +88,7 @@
                     if (!empty($data)) {
                         $system_content = "You are an AI that only answers questions about player stats, performance, and related topics.";
                         foreach ($data as $item) {
-                            $system_content .= "Player: " . $item['player_name'] . ", Wins: " . $item['win'] . ", Winrate: " . $item['winrate'] . ", Kills: " . $item['kills'] . ", Headshot Percentage: " . $item['headshot_percentage'] . ", Weapon Used: " . $item['weapon_used'] . ", MVP: " . $item['mvp'] . ", Overall Total Score: " . $item['overall_total_score'] . "; ";
+                            $system_content .= " Player: " . $item['player_name'] . ", Wins: " . $item['win'] . ", Winrate: " . $item['winrate'] . ", Kills: " . $item['kills'] . ", Headshot Percentage: " . $item['headshot_percentage'] . ", Weapon Used: " . $item['weapon_used'] . ", MVP: " . $item['mvp'] . ", Overall Total Score: " . $item['overall_total_score'] . ";";
                         }
 
                         $chatCompletion = $this->groq->chat()->completions()->create([
@@ -108,8 +108,9 @@
                         if (!is_null($chatCompletion)) {
                             $answer = $chatCompletion['choices'][0]['message']['content'];
                             // Log the response from the LLM
-                            $formatted_answer = preg_replace('/([.?!])\s*/', '$1<br>', $answer);
+                            $formatted_answer = nl2br(htmlspecialchars($answer)); // Add line breaks and escape HTML special characters
                             error_log("LLM response: " . $formatted_answer);
+                            $this->saveToFaqs($user_question);
                             return $formatted_answer;
                         } else {
                             error_log("LLM returned null response.");
@@ -118,28 +119,52 @@
                     } else {
                         return 'No data found.';
                     }
-             }
+                }
 
-            public function getFAQs() {
-              // SQL query to fetch FAQs from the database
-              $sql = "SELECT question, frequency FROM faqs ORDER BY frequency DESC LIMIT 5"; // Example query to get top 5 FAQs
-              $result = $this->conn->query($sql);
+                public function saveToFaqs($user_question) {
+                    // Check if the question already exists
+                    $stmt = $this->conn->prepare("SELECT id, frequency FROM faqs WHERE question = ?");
+                    $stmt->bind_param("s", $user_question);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    if ($result->num_rows > 0) {
+                        // Question exists, update the frequency
+                        $row = $result->fetch_assoc();
+                        $new_frequency = $row['frequency'] + 1;
+                        $update_stmt = $this->conn->prepare("UPDATE faqs SET frequency = ? WHERE id = ?");
+                        $update_stmt->bind_param("ii", $new_frequency, $row['id']);
+                        $update_stmt->execute();
+                        $update_stmt->close();
+                    } else {
+                        // Question does not exist, insert a new entry
+                        $insert_stmt = $this->conn->prepare("INSERT INTO faqs (question, frequency) VALUES (?, ?)");
+                        $frequency = 1;
+                        $insert_stmt->bind_param("si", $user_question, $frequency);
+                        $insert_stmt->execute();
+                        $insert_stmt->close();
+                    }
+                    $stmt->close();
+                }
 
-              $faqs = array();
-              if ($result->num_rows > 0) {
-                  // Collect FAQ results into an associative array
-                  while ($row = $result->fetch_assoc()) {
-                      $faqs[] = $row;
-                  }
-              }
-              return $faqs;
-          }
-        }
+                public function getFAQs() {
+                    // SQL query to fetch FAQs from the database
+                    $sql = "SELECT question, frequency FROM faqs ORDER BY frequency DESC LIMIT 5"; // Example query to get top 5 FAQs
+                    $result = $this->conn->query($sql);
 
-       $queryHandler = new QueryHandler();
+                    $faqs = array();
+                    if ($result->num_rows > 0) {
+                        // Collect FAQ results into an associative array
+                        while ($row = $result->fetch_assoc()) {
+                            $faqs[] = $row;
+                        }
+                    }
+                    return $faqs;
+                }
+            }
+
+            $queryHandler = new QueryHandler();
 
             if ($_SERVER["REQUEST_METHOD"] == "POST") {
-                $queryHandler = new QueryHandler();
                 $user_question = $_POST['question'];
                 $answer = $queryHandler->handleQuery($user_question);
 
@@ -157,13 +182,13 @@
     <div class="col-12">
       <div class="card">
         <div class="card-body">
-          <h5 class="card-title"> The Most Frequently Asked Questions</h5>
+          <h5 class="card-title">The Most Frequently Asked Questions</h5>
           <ul>
             <?php
               $faqs = $queryHandler->getFAQs();
               if (!empty($faqs)) {
                   foreach ($faqs as $faq) {
-                      echo "<li><strong>Q: " . $faq['question'] . "</strong><br>Total who asked: " . $faq['frequency'] . "</li><br>";
+                      echo "<li><strong>Q: " . htmlspecialchars($faq['question']) . "</strong><br>Total who asked: " . $faq['frequency'] . "</li><br>";
                   }
               } else {
                   echo "<li>No FAQs available at the moment.</li>";
@@ -215,7 +240,7 @@
                 const stat = document.getElementById('statFilter').value;
 
                 const params = new URLSearchParams({ weapon, stat });
-                fetch(`fetch_data_valorant.php?${params.toString()}`)
+                fetch(`fetch_data_counterstrike2.php?${params.toString()}`)
                   .then(response => response.json())
                   .then(data => {
                     const categories = data.map(item => item.player_name);
@@ -274,7 +299,7 @@
     <div class="col-lg-12">
       <div class="card">
         <div class="card-body">
-          <h5 class="card-title">Valorant Player Statistic Table in Detail</h5>
+          <h5 class="card-title">Counter Strike 2 Player Statistic Table in Detail</h5>
           <table class="table datatable">
             <div class="datatable-dropdown">
               <?php
@@ -293,14 +318,14 @@
                 }
 
                 // Fetch player stats
-                $sql = "SELECT player_name, win, winrate, kills, headshot_percentage, weapon_used, mvp, overall_total_score FROM valorant";
+                $sql = "SELECT player_name, win, winrate, kills, headshot_percentage, weapon_used, mvp, overall_total_score FROM counterstrike2";
                 $result = $conn->query($sql);
 
                 if ($result->num_rows > 0) {
                     echo '<table class="table datatable"><thead><tr><th scope="col">Player Name</th><th scope="col">Wins</th><th scope="col">Winrate</th><th scope="col">Kills</th><th scope="col">Headshot Percentage</th><th scope="col">Weapon Used</th><th scope="col">MVP</th><th scope="col">Overall Total Score</th></tr></thead><tbody>';
 
                     while ($row = $result->fetch_assoc()) {
-                        echo '<tr><td>' . $row["player_name"] . '</td><td>' . $row["win"] . '</td><td>' . $row["winrate"] . '</td><td>' . $row["kills"] . '</td><td>' . $row["headshot_percentage"] . '</td><td>' . $row["weapon_used"] . '</td><td>' . $row["mvp"] . '</td><td>' . $row["overall_total_score"] . '</td></tr>';
+                        echo '<tr><td>' . htmlspecialchars($row["player_name"]) . '</td><td>' . htmlspecialchars($row["win"]) . '</td><td>' . htmlspecialchars($row["winrate"]) . '</td><td>' . htmlspecialchars($row["kills"]) . '</td><td>' . htmlspecialchars($row["headshot_percentage"]) . '</td><td>' . htmlspecialchars($row["weapon_used"]) . '</td><td>' . htmlspecialchars($row["mvp"]) . '</td><td>' . htmlspecialchars($row["overall_total_score"]) . '</td></tr>';
                     }
 
                     echo '</tbody></table>';
@@ -318,4 +343,5 @@
   </div>
 </div>
 
+</body>
 </html>
